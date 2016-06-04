@@ -1,0 +1,5 @@
+<resources>
+    <string name="app_name">MyKeyboard</string>
+    <string name="ime_name">VitoKeyboard</string>
+    <string name="settings_name">Settings</string>
+</resources>

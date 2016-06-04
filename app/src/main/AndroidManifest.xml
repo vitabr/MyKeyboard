@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    package="com.vito.mykeyboard">
+
+    <application android:label="@string/ime_name"
+        android:theme="@style/AppTheme">
+        <service android:name=".services.VitoKeyboard"
+            android:permission="android.permission.BIND_INPUT_METHOD">
+            <intent-filter>
+                <action android:name="android.view.InputMethod" />
+            </intent-filter>
+            <meta-data android:name="android.view.im" android:resource="@xml/method"></meta-data>
+        </service>
+
+        <activity android:name=".ui.activitys.SettingsActivity" android:label="@string/settings_name">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN"/>
+            </intent-filter>
+        </activity>
+    </application>
+
+</manifest>
