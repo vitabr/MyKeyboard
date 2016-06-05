@@ -63,17 +63,7 @@ public class VitoKeyboard extends InputMethodService
      */
     static final boolean PROCESS_HARD_KEYS = true;
 
-    private InputMethodManager mInputMethodManager;
-
     private VitoKeyboardView mInputView;
-    private CompletionInfo[] mCompletions;
-    
-    private StringBuilder mComposing = new StringBuilder();
-    private boolean mPredictionOn;
-    private boolean mCompletionOn;
-    private int mLastDisplayWidth;
-    private long mMetaState;
-
     private Keyboard mQwertyKeyboard;
     private Keyboard mCurKeyboard;
 
@@ -83,8 +73,6 @@ public class VitoKeyboard extends InputMethodService
      */
     @Override public void onCreate() {
         super.onCreate();
-        Log.e("VITO", "VitoKeyboard:onCreate()");
-        mInputMethodManager = (InputMethodManager)getSystemService(INPUT_METHOD_SERVICE);
     }
     
     /**
@@ -92,16 +80,6 @@ public class VitoKeyboard extends InputMethodService
      * is called after creation and any configuration change.
      */
     @Override public void onInitializeInterface() {
-
-        Log.e("VITO", "VitoKeyboard:onInitializeInterface()");
-        if (mQwertyKeyboard != null) {
-            // Configuration changes can happen after the keyboard gets recreated,
-            // so we need to be able to re-build the keyboards if the available
-            // space has changed.
-            int displayWidth = getMaxWidth();
-            if (displayWidth == mLastDisplayWidth) return;
-            mLastDisplayWidth = displayWidth;
-        }
         mQwertyKeyboard = new Keyboard(this, R.xml.qwerty);
     }
     
@@ -134,24 +112,7 @@ public class VitoKeyboard extends InputMethodService
      */
     @Override public void onStartInput(EditorInfo attribute, boolean restarting) {
         super.onStartInput(attribute, restarting);
-
-        Log.e("VITO", "VitoKeyboard:onStartInput()");
-        // Reset our state.  We want to do this even if restarting, because
-        // the underlying state of the text editor could have changed in any way.
-        mComposing.setLength(0);
-        updateCandidates();
-        
-        if (!restarting) {
-            // Clear shift states.
-            mMetaState = 0;
-        }
-        
-        mPredictionOn = false;
-        mCompletionOn = false;
-        mCompletions = null;
-        
         mCurKeyboard = mQwertyKeyboard;
-
     }
 
     /**
@@ -160,16 +121,6 @@ public class VitoKeyboard extends InputMethodService
      */
     @Override public void onFinishInput() {
         super.onFinishInput();
-
-        Log.e("VITO", "VitoKeyboard:onFinishInput()");
-        // Clear current composing text and candidates.
-        mComposing.setLength(0);
-        updateCandidates();
-        
-        // We only hide the candidates window when finishing input on
-        // a particular editor, to avoid popping the underlying application
-        // up and down if the user is entering text into the bottom of
-        // its window.
         setCandidatesViewShown(false);
         
         mCurKeyboard = mQwertyKeyboard;
@@ -180,9 +131,6 @@ public class VitoKeyboard extends InputMethodService
     
     @Override public void onStartInputView(EditorInfo attribute, boolean restarting) {
         super.onStartInputView(attribute, restarting);
-
-        Log.e("VITO", "VitoKeyboard:onStartInputView()");
-        // Apply the selected keyboard to the input view.
         mInputView.setKeyboard(mCurKeyboard);
         mInputView.closing();
     }
@@ -199,18 +147,6 @@ public class VitoKeyboard extends InputMethodService
             int candidatesStart, int candidatesEnd) {
         super.onUpdateSelection(oldSelStart, oldSelEnd, newSelStart, newSelEnd,
                 candidatesStart, candidatesEnd);
-        
-        // If the current selection in the text view changes, we should
-        // clear whatever candidate text we have.
-        if (mComposing.length() > 0 && (newSelStart != candidatesEnd
-                || newSelEnd != candidatesEnd)) {
-            mComposing.setLength(0);
-            updateCandidates();
-            InputConnection ic = getCurrentInputConnection();
-            if (ic != null) {
-                ic.finishComposingText();
-            }
-        }
     }
 
     /**
@@ -220,57 +156,6 @@ public class VitoKeyboard extends InputMethodService
      * in that situation.
      */
     @Override public void onDisplayCompletions(CompletionInfo[] completions) {
-        if (mCompletionOn) {
-            mCompletions = completions;
-            if (completions == null) {
-                setSuggestions(null, false, false);
-                return;
-            }
-            
-            List<String> stringList = new ArrayList<String>();
-            for (int i = 0; i < completions.length; i++) {
-                CompletionInfo ci = completions[i];
-                if (ci != null) stringList.add(ci.getText().toString());
-            }
-            setSuggestions(stringList, true, true);
-        }
-    }
-    
-    /**
-     * This translates incoming hard key events in to edit operations on an
-     * InputConnection.  It is only needed when using the
-     * PROCESS_HARD_KEYS option.
-     */
-    private boolean translateKeyDown(int keyCode, KeyEvent event) {
-        mMetaState = MetaKeyKeyListener.handleKeyDown(mMetaState,
-                keyCode, event);
-        int c = event.getUnicodeChar(MetaKeyKeyListener.getMetaState(mMetaState));
-        mMetaState = MetaKeyKeyListener.adjustMetaAfterKeypress(mMetaState);
-        InputConnection ic = getCurrentInputConnection();
-        if (c == 0 || ic == null) {
-            return false;
-        }
-        
-        boolean dead = false;
-
-        if ((c & KeyCharacterMap.COMBINING_ACCENT) != 0) {
-            dead = true;
-            c = c & KeyCharacterMap.COMBINING_ACCENT_MASK;
-        }
-        
-        if (mComposing.length() > 0) {
-            char accent = mComposing.charAt(mComposing.length() -1 );
-            int composed = KeyEvent.getDeadChar(accent, c);
-
-            if (composed != 0) {
-                c = composed;
-                mComposing.setLength(mComposing.length()-1);
-            }
-        }
-        
-        onKey(c, null);
-        
-        return true;
     }
     
     /**
@@ -293,20 +178,12 @@ public class VitoKeyboard extends InputMethodService
                 break;
                 
             case KeyEvent.KEYCODE_DEL:
-                // Special handling of the delete key: if we currently are
-                // composing text for the user, we want to modify that instead
-                // of let the application to the delete itself.
-                if (mComposing.length() > 0) {
                     onKey(Keyboard.KEYCODE_DELETE, null);
                     return true;
-                }
-                break;
                 
             case KeyEvent.KEYCODE_ENTER:
-                if (mComposing.length() > 0) {
                     onKey(Keyboard.KEYCODE_DONE, null);
                     return true;
-                }
                 
             default:
                 // For all other keys, if we want to do transformations on
@@ -333,43 +210,10 @@ public class VitoKeyboard extends InputMethodService
                             return true;
                         }
                     }
-                    if (mPredictionOn && translateKeyDown(keyCode, event)) {
-                        return true;
-                    }
                 }
         }
         
         return super.onKeyDown(keyCode, event);
-    }
-
-    /**
-     * Use this to monitor key events being delivered to the application.
-     * We get first crack at them, and can either resume them or let them
-     * continue to the app.
-     */
-    @Override public boolean onKeyUp(int keyCode, KeyEvent event) {
-        // If we want to do transformations on text being entered with a hard
-        // keyboard, we need to process the up events to update the meta key
-        // state we are tracking.
-        if (PROCESS_HARD_KEYS) {
-            if (mPredictionOn) {
-                mMetaState = MetaKeyKeyListener.handleKeyUp(mMetaState,
-                        keyCode, event);
-            }
-        }
-        
-        return super.onKeyUp(keyCode, event);
-    }
-
-    /**
-     * Helper function to commit any text being composed in to the editor.
-     */
-    private void commitTyped(InputConnection inputConnection) {
-        if (mComposing.length() > 0) {
-            inputConnection.commitText(mComposing, mComposing.length());
-            mComposing.setLength(0);
-            updateCandidates();
-        }
     }
 
     /**
@@ -447,99 +291,31 @@ public class VitoKeyboard extends InputMethodService
     }
 
     private void handleBackspace() {
-        final int length = mComposing.length();
-        if (length > 1) {
-            mComposing.delete(length - 1, length);
-            getCurrentInputConnection().setComposingText(mComposing, 1);
-            updateCandidates();
-        } else if (length > 0) {
-            mComposing.setLength(0);
-            getCurrentInputConnection().commitText("", 0);
-            updateCandidates();
-        } else {
-            keyDownUp(KeyEvent.KEYCODE_DEL);
-        }
-        updateShiftKeyState(getCurrentInputEditorInfo());
+        keyDownUp(KeyEvent.KEYCODE_DEL);
     }
 
     public void onText(CharSequence text) {
         InputConnection ic = getCurrentInputConnection();
         if (ic == null) return;
         ic.beginBatchEdit();
-        if (mComposing.length() > 0) {
-            commitTyped(ic);
-        }
         ic.commitText(text, 0);
         ic.endBatchEdit();
         updateShiftKeyState(getCurrentInputEditorInfo());
     }
 
-    /**
-     * Update the list of available candidates from the current composing
-     * text.  This will need to be filled in by however you are determining
-     * candidates.
-     */
-    private void updateCandidates() {
-        if (!mCompletionOn) {
-            if (mComposing.length() > 0) {
-                ArrayList<String> list = new ArrayList<String>();
-                list.add(mComposing.toString());
-                setSuggestions(list, true, true);
-            } else {
-                setSuggestions(null, false, false);
-            }
-        }
-    }
-    
-    public void setSuggestions(List<String> suggestions, boolean completions,
-            boolean typedWordValid) {
-
-        setCandidatesViewShown(false);
-    }
-
     private void handleCharacter(int primaryCode, int[] keyCodes) {
-        if (isAlphabet(primaryCode) && mPredictionOn) {
-            mComposing.append((char) primaryCode);
-            getCurrentInputConnection().setComposingText(mComposing, 1);
-            updateShiftKeyState(getCurrentInputEditorInfo());
-            updateCandidates();
-        } else {
+
             getCurrentInputConnection().commitText(
                     String.valueOf((char) primaryCode), 1);
-        }
-    }
 
-    private void handleClose() {
-        commitTyped(getCurrentInputConnection());
-        requestHideSelf(0);
-        mInputView.closing();
-    }
-
-    public void pickDefaultCandidate() {
-        pickSuggestionManually(0);
-    }
-    
-    public void pickSuggestionManually(int index) {
-        if (mCompletionOn && mCompletions != null && index >= 0
-                && index < mCompletions.length) {
-            CompletionInfo ci = mCompletions[index];
-            getCurrentInputConnection().commitCompletion(ci);
-            updateShiftKeyState(getCurrentInputEditorInfo());
-        } else if (mComposing.length() > 0) {
-            // If we were generating candidate suggestions for the current
-            // text, we would commit one of them here.  But for this sample,
-            // we will just commit the current text.
-            commitTyped(getCurrentInputConnection());
-        }
-    }
-    
-    public void swipeRight() {
-        if (mCompletionOn) {
-            pickDefaultCandidate();
-        }
     }
     
     public void swipeLeft() {
+
+    }
+
+    @Override
+    public void swipeRight() {
 
     }
 
