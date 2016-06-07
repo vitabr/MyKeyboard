@@ -31,12 +31,15 @@ import com.vito.mykeyboard.R;
 import com.vito.mykeyboard.ui.views.VitoKeyboardView;
 import com.vito.mykeyboard.uttil.Parser;
 
+import java.util.Stack;
+
 public class VitoKeyboard extends InputMethodService
         implements KeyboardView.OnKeyboardActionListener {
 
     private VitoKeyboardView mInputView;
     private Keyboard mQwertyKeyboard;
     private Keyboard mCurKeyboard;
+    private Stack<String> mHistory = new Stack<>();
 
     /**
      * Main initialization of the input method component.  Be sure to call
@@ -164,7 +167,8 @@ public class VitoKeyboard extends InputMethodService
         if (primaryCode == Keyboard.KEYCODE_DONE) {
             handleDone();
         }else if (primaryCode == Keyboard.KEYCODE_DELETE) {
-            handleBackspace();
+            // Override Delete button as Hystory Button.
+            handleHistory();
         }else{
             handleCharacter(primaryCode, keyCodes);
         }
@@ -172,12 +176,25 @@ public class VitoKeyboard extends InputMethodService
 
     private void handleDone() {
 
-        String input = (String) getCurrentInputConnection().getExtractedText(new ExtractedTextRequest(),0).text;
-        CharSequence beforCursorText = getCurrentInputConnection().getTextBeforeCursor(input.length(), 0);
-        CharSequence afterCursorText = getCurrentInputConnection().getTextAfterCursor(input.length(), 0);
-        getCurrentInputConnection().deleteSurroundingText(beforCursorText.length(), afterCursorText.length());
+        String input = popText();
+        mHistory.push(input);
         String result = String.valueOf(new Parser().eval(input));
         getCurrentInputConnection().commitText(result, 1);
+    }
+
+    private void handleHistory() {
+        popText();
+        if(!mHistory.empty()){
+            getCurrentInputConnection().commitText(mHistory.pop(), 1);
+        }
+    }
+
+    private String popText() {
+        String inputText = (String) getCurrentInputConnection().getExtractedText(new ExtractedTextRequest(),0).text;
+        CharSequence beforCursorText = getCurrentInputConnection().getTextBeforeCursor(inputText.length(), 0);
+        CharSequence afterCursorText = getCurrentInputConnection().getTextAfterCursor(inputText.length(), 0);
+        getCurrentInputConnection().deleteSurroundingText(beforCursorText.length(), afterCursorText.length());
+        return inputText;
     }
 
     private void handleBackspace() {
