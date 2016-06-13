@@ -19,6 +19,7 @@ package com.vito.mykeyboard.services;
 import android.inputmethodservice.InputMethodService;
 import android.inputmethodservice.Keyboard;
 import android.inputmethodservice.KeyboardView;
+import android.support.annotation.NonNull;
 import android.view.KeyEvent;
 import android.view.View;
 import android.view.ViewGroup;
@@ -39,7 +40,7 @@ import com.vito.mykeyboard.R;
 import com.vito.mykeyboard.ui.views.VitoKeyboardView;
 import com.vito.mykeyboard.uttil.Parser;
 
-import java.util.ArrayList;
+import java.util.LinkedHashSet;
 
 public class VitoKeyboard extends InputMethodService
         implements KeyboardView.OnKeyboardActionListener {
@@ -47,8 +48,9 @@ public class VitoKeyboard extends InputMethodService
     private VitoKeyboardView mInputView;
     private Keyboard mQwertyKeyboard;
     private Keyboard mCurKeyboard;
-    private ArrayList<String> mHistory = new ArrayList<>();
     private ListView mHistoryList;
+    //To avoid double history entries i am using linked set
+    private LinkedHashSet<String> mHistory = new LinkedHashSet<>();
 
     /**
      * Main initialization of the input method component.  Be sure to call
@@ -200,15 +202,21 @@ public class VitoKeyboard extends InputMethodService
             mHistoryList.setBackgroundResource(R.color.white_half_transperent);
             ViewGroup.LayoutParams params = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, mInputView.getHeight());
             mHistoryList.setLayoutParams(params);
-            mHistoryList.setAdapter(new ArrayAdapter<String>(getBaseContext(), android.R.layout.simple_list_item_1, mHistory));
+            final String[] array = new String[mHistory.size()];
+            mHistoryList.setAdapter(new ArrayAdapter<String>(getBaseContext(), android.R.layout.simple_list_item_1, (String[]) mHistory.toArray(array)));
             mHistoryList.setOnItemClickListener(new AdapterView.OnItemClickListener() {
                 @Override
                 public void onItemClick(AdapterView<?> parent, View view, int position, long id) {
-
+                    deleteCurrentText();
+                    String selected = array[position];
+                    getCurrentInputConnection().commitText(selected, 1);
                     animateHistoryClose();
                 }
             });
         }
+
+        if(mHistoryList.getParent() != null)
+            ((FrameLayout)mHistoryList.getParent()).removeView(mHistoryList);
 
         ((FrameLayout)mInputView.getParent()).addView(mHistoryList);
         animateHistoryOpen();
@@ -246,6 +254,12 @@ public class VitoKeyboard extends InputMethodService
     }
 
     private String popText() {
+        String inputText = deleteCurrentText();
+        return inputText;
+    }
+
+    @NonNull
+    private String deleteCurrentText() {
         String inputText = (String) getCurrentInputConnection().getExtractedText(new ExtractedTextRequest(),0).text;
         CharSequence beforCursorText = getCurrentInputConnection().getTextBeforeCursor(inputText.length(), 0);
         CharSequence afterCursorText = getCurrentInputConnection().getTextAfterCursor(inputText.length(), 0);
