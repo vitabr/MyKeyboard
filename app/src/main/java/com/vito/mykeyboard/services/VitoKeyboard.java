@@ -202,18 +202,19 @@ public class VitoKeyboard extends InputMethodService
             mHistoryList.setBackgroundResource(R.color.white_half_transperent);
             ViewGroup.LayoutParams params = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, mInputView.getHeight());
             mHistoryList.setLayoutParams(params);
-            final String[] array = new String[mHistory.size()];
-            mHistoryList.setAdapter(new ArrayAdapter<String>(getBaseContext(), android.R.layout.simple_list_item_1, (String[]) mHistory.toArray(array)));
-            mHistoryList.setOnItemClickListener(new AdapterView.OnItemClickListener() {
-                @Override
-                public void onItemClick(AdapterView<?> parent, View view, int position, long id) {
-                    deleteCurrentText();
-                    String selected = array[position];
-                    getCurrentInputConnection().commitText(selected, 1);
-                    animateHistoryClose();
-                }
-            });
         }
+
+        final String[] array = new String[mHistory.size()];
+        mHistoryList.setAdapter(new ArrayAdapter<String>(getBaseContext(), android.R.layout.simple_list_item_1, mHistory.toArray(array)));
+        mHistoryList.setOnItemClickListener(new AdapterView.OnItemClickListener() {
+            @Override
+            public void onItemClick(AdapterView<?> parent, View view, int position, long id) {
+                deleteCurrentText();
+                String selected = array[position];
+                getCurrentInputConnection().commitText(selected, 1);
+                animateHistoryClose();
+            }
+        });
 
         if(mHistoryList.getParent() != null)
             ((FrameLayout)mHistoryList.getParent()).removeView(mHistoryList);
