@@ -20,4 +20,5 @@
 
 <resources>
     <dimen name="key_height">45dp</dimen>
+    <dimen name="list_item_text_left_margin">5dp</dimen>
 </resources>

@@ -21,17 +21,25 @@ import android.inputmethodservice.Keyboard;
 import android.inputmethodservice.KeyboardView;
 import android.view.KeyEvent;
 import android.view.View;
+import android.view.ViewGroup;
+import android.view.animation.Animation;
+import android.view.animation.AnimationUtils;
 import android.view.inputmethod.CompletionInfo;
 import android.view.inputmethod.EditorInfo;
 import android.view.inputmethod.ExtractedTextRequest;
 import android.view.inputmethod.InputConnection;
 import android.view.inputmethod.InputMethodSubtype;
+import android.widget.AdapterView;
+import android.widget.ArrayAdapter;
+import android.widget.FrameLayout;
+import android.widget.LinearLayout;
+import android.widget.ListView;
 
 import com.vito.mykeyboard.R;
 import com.vito.mykeyboard.ui.views.VitoKeyboardView;
 import com.vito.mykeyboard.uttil.Parser;
 
-import java.util.Stack;
+import java.util.ArrayList;
 
 public class VitoKeyboard extends InputMethodService
         implements KeyboardView.OnKeyboardActionListener {
@@ -39,7 +47,8 @@ public class VitoKeyboard extends InputMethodService
     private VitoKeyboardView mInputView;
     private Keyboard mQwertyKeyboard;
     private Keyboard mCurKeyboard;
-    private Stack<String> mHistory = new Stack<>();
+    private ArrayList<String> mHistory = new ArrayList<>();
+    private ListView mHistoryList;
 
     /**
      * Main initialization of the input method component.  Be sure to call
@@ -177,16 +186,63 @@ public class VitoKeyboard extends InputMethodService
     private void handleDone() {
 
         String input = popText();
-        mHistory.push(input);
+        mHistory.add(input);
         String result = String.valueOf(new Parser().eval(input));
         getCurrentInputConnection().commitText(result, 1);
     }
 
     private void handleHistory() {
-        popText();
-        if(!mHistory.empty()){
-            getCurrentInputConnection().commitText(mHistory.pop(), 1);
+        if(mHistory.isEmpty())
+            return;
+
+        if(mHistoryList == null) {
+            mHistoryList = new ListView(getBaseContext());
+            mHistoryList.setBackgroundResource(R.color.white_half_transperent);
+            ViewGroup.LayoutParams params = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, mInputView.getHeight());
+            mHistoryList.setLayoutParams(params);
+            mHistoryList.setAdapter(new ArrayAdapter<String>(getBaseContext(), android.R.layout.simple_list_item_1, mHistory));
+            mHistoryList.setOnItemClickListener(new AdapterView.OnItemClickListener() {
+                @Override
+                public void onItemClick(AdapterView<?> parent, View view, int position, long id) {
+
+                    animateHistoryClose();
+                }
+            });
         }
+
+        ((FrameLayout)mInputView.getParent()).addView(mHistoryList);
+        animateHistoryOpen();
+    }
+
+    private void animateHistoryOpen() {
+        Animation animation = AnimationUtils.loadAnimation(getBaseContext(), R.anim.slide_up);
+        animation.setStartOffset(0);
+        mHistoryList.startAnimation(animation);
+    }
+
+  /**
+   * Animate close history list view and remove it on animation end
+   */
+  private void animateHistoryClose() {
+        Animation animation = AnimationUtils.loadAnimation(getBaseContext(), R.anim.slide_down);
+        animation.setStartOffset(0);
+        animation.setAnimationListener(new Animation.AnimationListener() {
+            @Override
+            public void onAnimationStart(Animation animation) {
+
+            }
+
+            @Override
+            public void onAnimationEnd(Animation animation) {
+                ((FrameLayout)mInputView.getParent()).removeView(mHistoryList);
+            }
+
+            @Override
+            public void onAnimationRepeat(Animation animation) {
+
+            }
+        });
+        mHistoryList.startAnimation(animation);
     }
 
     private String popText() {
